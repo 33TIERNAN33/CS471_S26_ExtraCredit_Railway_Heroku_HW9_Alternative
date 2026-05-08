@@ -25,6 +25,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -60,14 +61,12 @@ public class HerokuApplication {
 
   @RequestMapping({"/db", "/database"})
   String db(Map<String, Object> model) {
+    System.out.println("Tiernan Benner");
+
     try (Connection connection = dataSource.getConnection()) {
       Statement stmt = connection.createStatement();
-      stmt.executeUpdate("CREATE TABLE IF NOT EXISTS table_timestamp_and_random_string (tick timestamp, random_string varchar(50))");
-
-      PreparedStatement insertStatement = connection.prepareStatement(
-          "INSERT INTO table_timestamp_and_random_string VALUES (now(), ?)");
-      insertStatement.setString(1, getRandomString());
-      insertStatement.executeUpdate();
+      createTableIfNeeded(stmt);
+      insertRecord(connection, getRandomString());
 
       ResultSet rs = stmt.executeQuery("SELECT tick, random_string FROM table_timestamp_and_random_string ORDER BY tick");
 
@@ -82,6 +81,35 @@ public class HerokuApplication {
       model.put("message", e.getMessage());
       return "error";
     }
+  }
+
+  @RequestMapping("/dbinput")
+  String dbInput() {
+    return "dbinput";
+  }
+
+  @RequestMapping("/dbinput/save")
+  String saveDbInput(@RequestParam("randomString") String randomString, Map<String, Object> model) {
+    try (Connection connection = dataSource.getConnection()) {
+      Statement stmt = connection.createStatement();
+      createTableIfNeeded(stmt);
+      insertRecord(connection, randomString);
+      return "redirect:/database";
+    } catch (Exception e) {
+      model.put("message", e.getMessage());
+      return "error";
+    }
+  }
+
+  private void createTableIfNeeded(Statement stmt) throws SQLException {
+    stmt.executeUpdate("CREATE TABLE IF NOT EXISTS table_timestamp_and_random_string (tick timestamp, random_string varchar(50))");
+  }
+
+  private void insertRecord(Connection connection, String randomString) throws SQLException {
+    PreparedStatement insertStatement = connection.prepareStatement(
+        "INSERT INTO table_timestamp_and_random_string VALUES (now(), ?)");
+    insertStatement.setString(1, randomString);
+    insertStatement.executeUpdate();
   }
 
   private String getRandomString() {
